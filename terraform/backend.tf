@@ -9,7 +9,7 @@
 # Il est placé dans les sous-réseaux PUBLICS pour être accessible depuis internet.
 resource "aws_lb" "main" {
   name               = "${var.project_name}-alb"
-  internal           = false                   # false = exposé à internet
+  internal           = false # false = exposé à internet
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets = [
@@ -37,13 +37,13 @@ resource "aws_lb_target_group" "backend" {
   # Health check : l'ALB vérifie régulièrement que l'API répond
   # Si GET /health ne renvoie pas 200, l'instance est retirée du pool
   health_check {
-    path                = "/health"       # Votre API doit avoir cette route !
+    path                = "/health" # Votre API doit avoir cette route !
     protocol            = "HTTP"
     matcher             = "200"
-    interval            = 30              # Vérification toutes les 30s
-    timeout             = 5               # Timeout après 5s
-    healthy_threshold   = 2               # 2 succès → instance saine
-    unhealthy_threshold = 3               # 3 échecs → instance retirée
+    interval            = 30 # Vérification toutes les 30s
+    timeout             = 5  # Timeout après 5s
+    healthy_threshold   = 2  # 2 succès → instance saine
+    unhealthy_threshold = 3  # 3 échecs → instance retirée
   }
 
   tags = {
@@ -85,7 +85,7 @@ resource "aws_launch_template" "backend" {
   user_data = base64encode(
     templatefile("${path.module}/user_data_backend.sh", {
       github_repo = var.github_repo
-      db_host     = aws_db_instance.main.address   # L'endpoint RDS, généré automatiquement
+      db_host     = aws_db_instance.main.address # L'endpoint RDS, généré automatiquement
       db_name     = var.db_name
       db_username = var.db_username
       db_password = var.db_password
@@ -102,7 +102,7 @@ resource "aws_launch_template" "backend" {
   }
 
   lifecycle {
-    create_before_destroy = true   # Crée la nouvelle version avant de supprimer l'ancienne
+    create_before_destroy = true # Crée la nouvelle version avant de supprimer l'ancienne
   }
 }
 
@@ -129,7 +129,7 @@ resource "aws_autoscaling_group" "backend" {
   # Modèle à utiliser pour créer les instances
   launch_template {
     id      = aws_launch_template.backend.id
-    version = "$Latest"   # Toujours utiliser la dernière version du template
+    version = "$Latest" # Toujours utiliser la dernière version du template
   }
 
   # Enregistrer automatiquement les instances dans le Target Group de l'ALB
@@ -137,7 +137,7 @@ resource "aws_autoscaling_group" "backend" {
 
   # Utiliser le health check de l'ALB (plus fiable que le health check EC2 de base)
   health_check_type         = "ELB"
-  health_check_grace_period = 120   # 2 minutes pour que l'instance démarre avant le check
+  health_check_grace_period = 120 # 2 minutes pour que l'instance démarre avant le check
 
   tag {
     key                 = "Name"
@@ -147,7 +147,7 @@ resource "aws_autoscaling_group" "backend" {
 
   depends_on = [
     aws_lb_listener.http,
-    aws_db_instance.main   # La DB doit être prête avant que les instances démarrent
+    aws_db_instance.main # La DB doit être prête avant que les instances démarrent
   ]
 }
 
@@ -163,6 +163,6 @@ resource "aws_autoscaling_policy" "cpu_tracking" {
     predefined_metric_specification {
       predefined_metric_type = "ASGAverageCPUUtilization"
     }
-    target_value = 70.0   # Si CPU moyen > 70%, AWS ajoute des instances
+    target_value = 70.0 # Si CPU moyen > 70%, AWS ajoute des instances
   }
 }

@@ -34,7 +34,7 @@ provider "aws" {
 # Terraform le trouve tout seul à chaque fois.
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"]  # Canonical (l'éditeur d'Ubuntu)
+  owners      = ["099720109477"] # Canonical (l'éditeur d'Ubuntu)
 
   filter {
     name   = "name"

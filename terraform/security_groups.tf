@@ -1,27 +1,27 @@
 # ============================================
-# SECURITY GROUPS — Pare-feux par couche
+# SECURITY GROUPS - Firewalls by layer
 # ============================================
 #
-# Architecture des flux autorisés :
+# Authorized traffic architecture:
 #
-#   Internet → ALB (port 80)
-#   ALB → Backend EC2 (port API)
-#   Backend EC2 → RDS (port 3306/5432)
-#   Internet → Frontend EC2 (port 80)
-#   Votre IP → Frontend EC2 (port 22, SSH)
+#   Internet -> ALB port 80
+#   ALB -> Backend EC2 API port
+#   Backend EC2 -> RDS port 3306 or 5432
+#   Internet -> Frontend EC2 port 80
+#   Your IP -> Frontend EC2 port 22 SSH
+#   Frontend -> Backend port 22 SSH (temporary for debugging)
 #
-# Aucune autre communication n'est autorisée.
+# No other communication is allowed.
 # ============================================
 
-# ════════════════════════════════════════
-# SG 1 : ALB — reçoit le trafic internet
-# ════════════════════════════════════════
+# ============================================
+# SG 1: ALB - receives internet traffic
+# ============================================
 resource "aws_security_group" "alb" {
   name        = "${var.project_name}-sg-alb"
   description = "ALB : accepte HTTP depuis internet uniquement"
   vpc_id      = aws_vpc.main.id
 
-  # HTTP depuis n'importe où sur internet
   ingress {
     description = "HTTP entrant"
     from_port   = 80
@@ -30,7 +30,6 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # L'ALB peut sortir vers les instances du Target Group
   egress {
     from_port   = 0
     to_port     = 0
@@ -42,28 +41,37 @@ resource "aws_security_group" "alb" {
     Name    = "${var.project_name}-sg-alb"
     Project = var.project_name
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# ════════════════════════════════════════
-# SG 2 : Backend EC2 — reçoit trafic de l'ALB seulement
-# ════════════════════════════════════════
-# ⚠️ Jamais depuis internet directement !
+# ============================================
+# SG 2: Backend EC2 - receives traffic from ALB only
+# ============================================
 resource "aws_security_group" "backend" {
   name        = "${var.project_name}-sg-backend"
-  description = "Backend EC2 : trafic entrant uniquement depuis le SG de l'ALB"
+  description = "Backend EC2 - traffic from ALB only"
   vpc_id      = aws_vpc.main.id
 
-  # Accepte uniquement les connexions venant du Security Group de l'ALB
-  # (pas depuis 0.0.0.0/0 — même si le port est le bon !)
   ingress {
-    description     = "Trafic API depuis l'ALB"
+    description     = "API traffic from ALB"
     from_port       = var.app_port
     to_port         = var.app_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]  # ← référence au SG ALB
+    security_groups = [aws_security_group.alb.id]
   }
 
-  # Sortie libre pour git clone, npm install, etc.
+  # ← TEMPORARY: remove this block after debugging
+  ingress {
+    description     = "SSH from frontend for debugging"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.frontend.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -75,24 +83,26 @@ resource "aws_security_group" "backend" {
     Name    = "${var.project_name}-sg-backend"
     Project = var.project_name
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# ════════════════════════════════════════
-# SG 3 : RDS — reçoit trafic du backend seulement
-# ════════════════════════════════════════
-# ⚠️ Jamais depuis internet, jamais depuis votre ordinateur !
+# ============================================
+# SG 3: RDS - receives database traffic from backend only
+# ============================================
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-sg-rds"
-  description = "RDS : trafic entrant uniquement depuis le SG backend"
+  description = "RDS - database traffic from backend only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "MySQL depuis le backend"
-    from_port       = 3306     # Changez en 5432 si vous utilisez PostgreSQL
-    to_port         = 3306
+    description     = "MySQL from backend"
+    from_port       = var.db_engine == "postgres" ? 5432 : 3306
+    to_port         = var.db_engine == "postgres" ? 5432 : 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.backend.id]  # ← backend seulement
-    # ⚠️ JAMAIS cidr_blocks = ["0.0.0.0/0"] ici !
+    security_groups = [aws_security_group.backend.id]
   }
 
   egress {
@@ -106,17 +116,20 @@ resource "aws_security_group" "rds" {
     Name    = "${var.project_name}-sg-rds"
     Project = var.project_name
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# ════════════════════════════════════════
-# SG 4 : Frontend EC2 — HTTP public + SSH limité
-# ════════════════════════════════════════
+# ============================================
+# SG 4: Frontend EC2 - public HTTP and SSH from my IP
+# ============================================
 resource "aws_security_group" "frontend" {
   name        = "${var.project_name}-sg-frontend"
-  description = "Frontend EC2 : HTTP public + SSH depuis votre IP seulement"
+  description = "Frontend EC2 - public HTTP and SSH from my IP only"
   vpc_id      = aws_vpc.main.id
 
-  # HTTP depuis n'importe où (les visiteurs accèdent au site)
   ingress {
     description = "HTTP public"
     from_port   = 80
@@ -125,13 +138,12 @@ resource "aws_security_group" "frontend" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # SSH depuis votre IP uniquement (débogage)
   ingress {
-    description = "SSH depuis mon IP"
+    description = "SSH from my IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip]   # ← uniquement votre IP, pas 0.0.0.0/0
+    cidr_blocks = [var.my_ip]
   }
 
   egress {
@@ -144,5 +156,9 @@ resource "aws_security_group" "frontend" {
   tags = {
     Name    = "${var.project_name}-sg-frontend"
     Project = var.project_name
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }

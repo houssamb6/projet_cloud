@@ -19,7 +19,12 @@ const sampleUsers = [
   { id: 3, name: 'Bob Johnson', email: 'bob@example.com' }
 ];
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+  credentials: false
+}));
 app.use(express.json());
 
 let db = null;
@@ -30,7 +35,7 @@ function initializeDatabase() {
   db = mysql.createConnection({
     host: process.env.DB_HOST || 'database1.colpdmacwjni.us-east-1.rds.amazonaws.com',
     user: process.env.DB_USER || 'admin',
-    password: process.env.DB_PASSWORD || 'admin123',
+    password: process.env.DB_PASSWORD || process.env.DB_PASS || 'admin123',
     database: process.env.DB_NAME || 'database3'
   });
 
@@ -313,6 +318,10 @@ app.get('/server-info', async (req, res) => {
 
 app.get('/', (req, res) => {
   res.status(200).json('Hello from Backend app!');
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
 app.get('/api/users', async (req, res) => {

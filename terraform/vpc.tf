@@ -6,8 +6,8 @@
 # Le VPC — le réseau isolé
 # ════════════════════════════════════════
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"   # 65 536 adresses IP disponibles
-  enable_dns_hostnames = true             # Permet aux instances d'avoir un nom DNS
+  cidr_block           = "10.0.0.0/16" # 65 536 adresses IP disponibles
+  enable_dns_hostnames = true          # Permet aux instances d'avoir un nom DNS
   enable_dns_support   = true
 
   tags = {
@@ -36,9 +36,9 @@ resource "aws_internet_gateway" "igw" {
 
 resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"         # 256 adresses
-  availability_zone       = "${var.aws_region}a"   # Zone A
-  map_public_ip_on_launch = true                   # IP publique automatique
+  cidr_block              = "10.0.1.0/24"        # 256 adresses
+  availability_zone       = "${var.aws_region}a" # Zone A
+  map_public_ip_on_launch = true                 # IP publique automatique
 
   tags = {
     Name    = "${var.project_name}-subnet-public-a"
@@ -49,7 +49,7 @@ resource "aws_subnet" "public_a" {
 resource "aws_subnet" "public_b" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.2.0/24"
-  availability_zone       = "${var.aws_region}b"   # Zone B — pour la résilience
+  availability_zone       = "${var.aws_region}b" # Zone B — pour la résilience
   map_public_ip_on_launch = true
 
   tags = {
@@ -95,7 +95,7 @@ resource "aws_subnet" "private_b" {
 
 resource "aws_eip" "nat" {
   domain     = "vpc"
-  depends_on = [aws_internet_gateway.igw]  # L'IGW doit exister avant
+  depends_on = [aws_internet_gateway.igw] # L'IGW doit exister avant
 
   tags = {
     Name    = "${var.project_name}-nat-eip"
@@ -105,7 +105,7 @@ resource "aws_eip" "nat" {
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public_a.id   # Placé dans le sous-réseau PUBLIC
+  subnet_id     = aws_subnet.public_a.id # Placé dans le sous-réseau PUBLIC
 
   tags = {
     Name    = "${var.project_name}-nat-gw"
@@ -127,8 +127,8 @@ resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   route {
-    cidr_block = "0.0.0.0/0"                  # Tout le trafic externe
-    gateway_id = aws_internet_gateway.igw.id   # passe par l'IGW
+    cidr_block = "0.0.0.0/0"                 # Tout le trafic externe
+    gateway_id = aws_internet_gateway.igw.id # passe par l'IGW
   }
 
   tags = {
@@ -142,7 +142,7 @@ resource "aws_route_table" "private" {
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id   # passe par le NAT GW
+    nat_gateway_id = aws_nat_gateway.nat.id # passe par le NAT GW
   }
 
   tags = {

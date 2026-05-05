@@ -84,5 +84,5 @@ variable "db_username" {
 variable "db_password" {
   description = "Mot de passe RDS — ne pas écrire ici, mettre dans terraform.tfvars"
   type        = string
-  sensitive   = true   # Terraform masquera cette valeur dans les logs
+  sensitive   = true # Terraform masquera cette valeur dans les logs
 }
